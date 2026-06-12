@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+venv/
+trustguard_subgraph/*
+railway.toml
+sql_migrate.py
+trustguard.db
+trustguard.db-shm
+trustguard.db-wal
+workflow.md
+scripts/*

@@ -1,0 +1,50 @@
+{
+  "type": "Agent",
+  "name": "TrustGuard Router",
+  "description": "Infrastructure agent providing verification, discovery, escrow routing, trust scoring and LLM-powered task execution for the Celo ecosystem.",
+  "version": "1.0.0",
+  "endpoints": [
+    {
+      "type": "a2a",
+      "url": "https://your-railway-app.up.railway.app/agent/a2a"
+    },
+    {
+      "type": "api",
+      "url": "https://your-railway-app.up.railway.app"
+    }
+  ],
+  "capabilities": [
+    "agent-verification",
+    "agent-discovery",
+    "escrow-routing",
+    "trust-scoring",
+    "x402-payments",
+    "natural-language-task-execution"
+  ],
+  "supportedModels": [
+    "claude-sonnet-4-20250514",
+    "gpt-4o",
+    "llama-3.3-70b-versatile"
+  ],
+  "supportedTrust": ["reputation", "validation"],
+  "supportedTokens": [
+    {
+      "symbol":  "USDm",
+      "address": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
+      "chainId": 42220
+    },
+    {
+      "symbol":  "USDC",
+      "address": "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
+      "chainId": 42220
+    }
+  ],
+  "x402": {
+    "supported": true,
+    "pricePerTask": "1000",
+    "currency": "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
+    "chainId": 42220
+  },
+  "chainId": 42220,
+  "network": "celo-mainnet"
+}
