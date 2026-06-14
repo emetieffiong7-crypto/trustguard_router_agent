@@ -16,15 +16,20 @@ logger = logging.getLogger("trustguard.agent")
 # Shortened system prompt — ~80 tokens vs original ~200
 # -------------------------------------------------------------------------
 
-SYSTEM_PROMPT = """You are TrustGuard, a Celo ERC-8004 infrastructure agent.
-Help agents discover, verify, and pay each other safely.
+SYSTEM_PROMPT = """You are TrustGuard, a Celo infrastructure agent.
+Help people find, check, and safely pay agents in the Celo ecosystem.
 
 Rules:
-- Verify unknown agents before routing payments
-- Use escrow for amounts above threshold or low-trust agents
-- Use x402 only for small amounts to trusted agents
-- Always post results onchain
-- Be concise. State what you did and include any tx hashes."""
+- Only talk about agents and data your tools actually returned. Never invent
+  agent names, hashes, block numbers, or addresses.
+- Never use placeholder values like "0x..." as an address. If you don't have
+  a real address from a previous tool result, don't call a tool that needs one.
+- Be decisive: once a tool gives you useful results, use them. Don't repeat
+  the same tool with similar filters — pick the best result and answer.
+- Verify unknown agents before suggesting payment.
+- Use escrow for amounts above the threshold or for low-trust agents.
+- Use x402 only for small amounts to trusted agents.
+- Keep answers short, plain, and specific to what you found."""
 
 
 # -------------------------------------------------------------------------
@@ -85,10 +90,19 @@ def _select_tools_for_task(task: str) -> list:
         selected.add("get_agent_profile")
 
     # Payment intent
-    if any(w in task_lower for w in [
-        "pay", "escrow", "transfer", "send", "fund",
-        "payment", "settle", "release", "refund", "lock"
-    ]):
+    # if any(w in task_lower for w in [
+    #     "pay", "escrow", "transfer", "send", "fund",
+    #     "payment", "settle", "release", "refund", "lock"
+    # ]):
+    payment_phrases = [
+        "pay for", "pay them", "pay this", "pay that", "pay agent",
+        "make a payment", "send a payment", "send payment",
+        "create an escrow", "create escrow", "set up escrow",
+        "release escrow", "release the payment", "refund",
+        "lock funds", "settle the payment", "settle payment",
+        "transfer funds", "transfer money",
+    ]
+    if any(p in task_lower for p in payment_phrases):
         selected.add("create_escrow")
         selected.add("release_escrow")
         selected.add("check_escrow_status")
@@ -274,7 +288,49 @@ class AgentLoop:
 
             # Any other error — re-raise so the route handler catches it
             raise
+    async def _force_synthesis(self, task: str) -> str:
+        """
+        Called when the loop ends without a real text answer — either the
+        LLM hit max iterations or returned empty content. Makes one final
+        call with no tools, grounded strictly in what was already found,
+        so the user never sees a blank or hallucinated response.
+        """
+        if not self.tool_calls_made:
+            return (
+                "I couldn't find anything useful for that. Try rephrasing, "
+                "or ask about a specific agent by name or ID."
+            )
 
+        findings = []
+        for tc in self.tool_calls_made:
+            result_str = json.dumps(tc["result"], default=str)
+            findings.append(f"- {tc['tool']}: {result_str[:500]}")
+
+        synthesis_prompt = (
+            f"The user asked: {task}\n\n"
+            "Here is everything that was found:\n"
+            + "\n".join(findings) +
+            "\n\nWrite a short, direct answer using only the information above. "
+            "Do not invent agents, names, addresses, hashes, or numbers that "
+            "are not shown above. If nothing useful was found, say so plainly "
+            "and suggest what to try next."
+        )
+
+        try:
+            provider = self._get_provider(task)
+            response = await provider.complete(
+                messages   = [LLMMessage(role="user", content=synthesis_prompt)],
+                tools      = [],
+                system     = SYSTEM_PROMPT,
+                max_tokens = 500,
+            )
+            return response.content.strip() or (
+                "I found some information but couldn't summarise it. Please try again."
+            )
+        except Exception as e:
+            logger.warning(f"Synthesis pass failed: {e}")
+            return "I found some information but ran into an issue summarising it. Please try again."
+    
     async def run(self, task: str) -> dict:
         """
         Run the agent loop synchronously and return the final result.
@@ -335,11 +391,28 @@ class AgentLoop:
                     tool_call_id = tool_call.id,
                 ))
 
+        # final_response = ""
+        # for msg in reversed(self.messages):
+        #     if msg.role == "assistant" and msg.content:
+        #         final_response = msg.content
+        #         break
+
+        # return {
+        #     "response":        final_response,
+        #     "tool_calls_made": self.tool_calls_made,
+        #     "iterations":      self.iterations,
+        #     "model":           self._resolved_model or settings.default_llm_model,
+        #     "tools_used":      list({tc["tool"] for tc in self.tool_calls_made}),
+        # }
         final_response = ""
         for msg in reversed(self.messages):
             if msg.role == "assistant" and msg.content:
                 final_response = msg.content
                 break
+
+        if not final_response.strip():
+            logger.info("No grounded answer produced — running synthesis pass")
+            final_response = await self._force_synthesis(task)
 
         return {
             "response":        final_response,
@@ -433,10 +506,25 @@ class AgentLoop:
                 }
 
             # No tool calls — final answer reached
+            # if not response.tool_calls:
+            #     yield {
+            #         "type":            "complete",
+            #         "response":        response.content,
+            #         "tool_calls_made": self.tool_calls_made,
+            #         "iterations":      self.iterations,
+            #         "model":           self._resolved_model or settings.default_llm_model,
+            #         "tools_used":      list({tc["tool"] for tc in self.tool_calls_made}),
+            #     }
+            #     return
             if not response.tool_calls:
+                final = response.content.strip()
+                if not final:
+                    yield {"type": "reasoning", "content": "Pulling together what I found..."}
+                    final = await self._force_synthesis(task)
+
                 yield {
                     "type":            "complete",
-                    "response":        response.content,
+                    "response":        final,
                     "tool_calls_made": self.tool_calls_made,
                     "iterations":      self.iterations,
                     "model":           self._resolved_model or settings.default_llm_model,
@@ -475,11 +563,30 @@ class AgentLoop:
                 ))
 
         # Max iterations reached
+        # final_response = ""
+        # for msg in reversed(self.messages):
+        #     if msg.role == "assistant" and msg.content:
+        #         final_response = msg.content
+        #         break
+
+        # yield {
+        #     "type":            "complete",
+        #     "response":        final_response,
+        #     "tool_calls_made": self.tool_calls_made,
+        #     "iterations":      self.iterations,
+        #     "model":           self._resolved_model or settings.default_llm_model,
+        #     "tools_used":      list({tc["tool"] for tc in self.tool_calls_made}),
+        #     "note":            "Max iterations reached",
+        # }
         final_response = ""
         for msg in reversed(self.messages):
             if msg.role == "assistant" and msg.content:
                 final_response = msg.content
                 break
+
+        if not final_response.strip():
+            yield {"type": "reasoning", "content": "Pulling together what I found..."}
+            final_response = await self._force_synthesis(task)
 
         yield {
             "type":            "complete",
@@ -488,9 +595,8 @@ class AgentLoop:
             "iterations":      self.iterations,
             "model":           self._resolved_model or settings.default_llm_model,
             "tools_used":      list({tc["tool"] for tc in self.tool_calls_made}),
-            "note":            "Max iterations reached",
         }
-
+        
     # -------------------------------------------------------------------------
     # Tool execution router
     # -------------------------------------------------------------------------
