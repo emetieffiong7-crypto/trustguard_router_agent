@@ -31,59 +31,6 @@ Rules:
 # Tool selection — send only relevant tools per task
 # -------------------------------------------------------------------------
 
-# def _select_tools_for_task(task: str) -> list:
-#     task_lower = task.lower()
-#     selected   = set()
-
-#     selected.add("discover_agents")
-
-#     # Single agent lookup intent
-#     if any(w in task_lower for w in [
-#         "about agent", "tell me about", "who is", "find agent",
-#         "agent 0x", "agentid", "agent id", "address 0x",
-#         "profile", "details about", "information about", "trust"
-#     ]):
-#         selected.add("get_agent_profile")
-
-#     # Verification intent
-#     if any(w in task_lower for w in [
-#         "verify", "check", "probe", "test", "endpoint",
-#         "working", "reachable", "valid", "confirm"
-#     ]):
-#         selected.add("verify_agent")
-#         selected.add("get_agent_profile")
-
-#     # Score and trust intent
-#     if any(w in task_lower for w in [
-#         "score", "trust", "reputation", "history",
-#         "reliable", "safe", "risk", "blacklist"
-#     ]):
-#         selected.add("get_agent_score")
-#         selected.add("get_agent_profile")
-
-#     # Payment intent
-#     if any(w in task_lower for w in [
-#         "pay", "escrow", "transfer", "send", "fund",
-#         "payment", "settle", "release", "refund", "lock"
-#     ]):
-#         selected.add("create_escrow")
-#         selected.add("release_escrow")
-#         selected.add("check_escrow_status")
-#         selected.add("get_agent_profile")
-
-#     # x402 intent
-#     if any(w in task_lower for w in [
-#         "x402", "micropay", "micro", "small payment",
-#         "pay per request", "http payment"
-#     ]):
-#         selected.add("execute_x402_payment")
-
-#     if len(selected) <= 1:
-#         return TRUSTGUARD_TOOLS
-
-#     name_to_tool = {t.name: t for t in TRUSTGUARD_TOOLS}
-#     return [name_to_tool[name] for name in selected if name in name_to_tool]
-
 def _select_tools_for_task(task: str) -> list:
     task_lower = task.lower()
     selected   = set()
@@ -251,10 +198,12 @@ class AgentLoop:
     def __init__(
         self,
         model: Optional[str] = None,
-        db:    Optional[AsyncSession] = None
+        db:    Optional[AsyncSession] = None,
+        allow_onchain: bool = True,
     ):
         self.requested_model = model
         self.db              = db
+        self.allow_onchain   = allow_onchain
         self.messages: list[LLMMessage] = []
         self.iterations      = 0
         self.tool_calls_made: list[dict] = []
@@ -608,7 +557,7 @@ class AgentLoop:
             agent_address = params["agent_address"],
             agent_id      = params.get("agent_id", 0),
             db            = self.db,
-            post_onchain  = True,
+            post_onchain  = self.allow_onchain,
         )
         return {
             "overall_passed":    result.overall_passed,
