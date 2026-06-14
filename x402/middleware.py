@@ -41,6 +41,10 @@ class X402ServerMiddleware(BaseHTTPMiddleware):
         # Only applies to x402-protected routes
         if path not in X402_PROTECTED_ROUTES:
             return await call_next(request)
+        # Anonymous callers (landing page demo) are exempt from payment —
+        # they're already rate-limited tightly by the auth middleware.
+        if getattr(request.state, "auth_type", None) == "anonymous":
+            return await call_next(request)
 
         price      = X402_PROTECTED_ROUTES[path]
         payment    = request.headers.get("X-Payment") or \
