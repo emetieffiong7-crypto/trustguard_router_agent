@@ -1,16 +1,22 @@
 {
-  "type": "Agent",
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
   "name": "TrustGuard Router",
   "description": "Infrastructure agent providing verification, discovery, escrow routing, trust scoring and LLM-powered task execution for the Celo ecosystem.",
+  "image": "",
+  "active": true,
   "version": "1.0.0",
-  "endpoints": [
+  "services": [
+    {
+      "name": "web",
+      "endpoint": "https://trustguard-khaki.vercel.app/"
+    },
     {
       "type": "a2a",
-      "url": "https://your-railway-app.up.railway.app/agent/a2a"
+      "url": "https://trustguardrouteragent-production.up.railway.app/agent/a2a"
     },
     {
       "type": "api",
-      "url": "https://your-railway-app.up.railway.app"
+      "url": "https://trustguardrouteragent-production.up.railway.app"
     }
   ],
   "capabilities": [
@@ -46,5 +52,6 @@
     "chainId": 42220
   },
   "chainId": 42220,
-  "network": "celo-mainnet"
+  "network": "celo-mainnet",
+  "x402Support": true
 }
