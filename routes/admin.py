@@ -1,5 +1,6 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, Header, Request, logger
+import logging
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
@@ -7,6 +8,8 @@ from datetime import datetime
 from db.base import get_db
 from db.models import ApiKey
 from config import settings
+
+logger = logging.getLogger("trustguard.routes.admin")
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
