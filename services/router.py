@@ -77,20 +77,21 @@ async def create_escrow(
     })
 
     tx_hash = await web3_client.send_transaction(tx)
+    receipt = await web3_client.wait_for_receipt(tx_hash)
 
-    # Derive escrow ID — matches contract logic
-    escrow_id = AsyncWeb3.keccak(
-        encode(
-            ["address", "uint256", "address", "uint256", "uint256"],
-            [
-                AsyncWeb3.to_checksum_address(web3_client.router_address),
-                request.payee_agent_id,
-                AsyncWeb3.to_checksum_address(request.token),
-                int(request.amount_wei),
-                int(datetime.utcnow().timestamp())
-            ]
+    escrow_events = (
+        web3_client.trustguard.events.EscrowCreated()
+        .processReceipt(receipt)
+    )
+    if not escrow_events:
+        raise RuntimeError(
+            "Could not determine escrow ID from createEscrow transaction receipt"
         )
-    ).hex()
+
+    escrow_id = escrow_events[0]["args"]["escrowId"]
+    if hasattr(escrow_id, "hex"):
+        escrow_id = escrow_id.hex()
+    escrow_id = str(escrow_id)
 
     # Persist to local database
     escrow_record = Escrow(

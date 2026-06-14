@@ -1,0 +1,32 @@
+﻿{
+    "value":  [
+                  {
+                      "id":  "718b474a-4a90-4c03-af67-21fa84800247",
+                      "hackathonId":  "0bb95497-9b1d-4f30-9c86-cb174ca1a993",
+                      "slug":  "best-agent",
+                      "title":  "Best Agent on Celo",
+                      "description":  "Build the best onchain agent on Celo, judged on ecosystem alignment, onchain activity, and real-world utility.",
+                      "sourceUrl":  null,
+                      "createdAt":  "2026-06-08T05:20:01.530Z"
+                  },
+                  {
+                      "id":  "ee0d8378-16c8-4b7d-9400-a2ae3e82cd40",
+                      "hackathonId":  "0bb95497-9b1d-4f30-9c86-cb174ca1a993",
+                      "slug":  "8004scan-rank",
+                      "title":  "Highest Rank in 8004scan for Celo",
+                      "description":  "Achieve the highest rank in 8004scan for Celo. Can be combined with other tracks.",
+                      "sourceUrl":  null,
+                      "createdAt":  "2026-06-08T05:20:01.530Z"
+                  },
+                  {
+                      "id":  "c6f80364-161c-4148-84b6-dfc46c7b067e",
+                      "hackathonId":  "0bb95497-9b1d-4f30-9c86-cb174ca1a993",
+                      "slug":  "most-activity",
+                      "title":  "Most Activity",
+                      "description":  "Generate the most onchain transactions. Can be combined with other tracks.",
+                      "sourceUrl":  null,
+                      "createdAt":  "2026-06-08T05:20:01.530Z"
+                  }
+              ],
+    "Count":  3
+}

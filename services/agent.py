@@ -29,8 +29,10 @@ Rules:
 - Verify unknown agents before suggesting payment.
 - Use escrow for amounts above the threshold or for low-trust agents.
 - Use x402 only for small amounts to trusted agents.
-- Keep answers short, plain, and specific to what you found."""
-
+- IMPORTANT: When answering, always include the exact agent_id, trust_score,
+  risk_level, and owner_address from the tool result. Do not summarise these
+  away. Format your answer as: Agent #<id> | Score: <n>/100 | Risk: <level> |
+  Owner: <address> — then explain what you found."""
 
 # -------------------------------------------------------------------------
 # Tool selection — send only relevant tools per task
@@ -288,13 +290,49 @@ class AgentLoop:
 
             # Any other error — re-raise so the route handler catches it
             raise
+    # async def _force_synthesis(self, task: str) -> str:
+    #     """
+    #     Called when the loop ends without a real text answer — either the
+    #     LLM hit max iterations or returned empty content. Makes one final
+    #     call with no tools, grounded strictly in what was already found,
+    #     so the user never sees a blank or hallucinated response.
+    #     """
+    #     if not self.tool_calls_made:
+    #         return (
+    #             "I couldn't find anything useful for that. Try rephrasing, "
+    #             "or ask about a specific agent by name or ID."
+    #         )
+
+    #     findings = []
+    #     for tc in self.tool_calls_made:
+    #         result_str = json.dumps(tc["result"], default=str)
+    #         findings.append(f"- {tc['tool']}: {result_str[:500]}")
+
+    #     synthesis_prompt = (
+    #         f"The user asked: {task}\n\n"
+    #         "Here is everything that was found:\n"
+    #         + "\n".join(findings) +
+    #         "\n\nWrite a short, direct answer using only the information above. "
+    #         "Do not invent agents, names, addresses, hashes, or numbers that "
+    #         "are not shown above. If nothing useful was found, say so plainly "
+    #         "and suggest what to try next."
+    #     )
+
+    #     try:
+    #         provider = self._get_provider(task)
+    #         response = await provider.complete(
+    #             messages   = [LLMMessage(role="user", content=synthesis_prompt)],
+    #             tools      = [],
+    #             system     = SYSTEM_PROMPT,
+    #             max_tokens = 500,
+    #         )
+    #         return response.content.strip() or (
+    #             "I found some information but couldn't summarise it. Please try again."
+    #         )
+    #     except Exception as e:
+    #         logger.warning(f"Synthesis pass failed: {e}")
+    #         return "I found some information but ran into an issue summarising it. Please try again."
     async def _force_synthesis(self, task: str) -> str:
-        """
-        Called when the loop ends without a real text answer — either the
-        LLM hit max iterations or returned empty content. Makes one final
-        call with no tools, grounded strictly in what was already found,
-        so the user never sees a blank or hallucinated response.
-        """
         if not self.tool_calls_made:
             return (
                 "I couldn't find anything useful for that. Try rephrasing, "
@@ -304,16 +342,16 @@ class AgentLoop:
         findings = []
         for tc in self.tool_calls_made:
             result_str = json.dumps(tc["result"], default=str)
-            findings.append(f"- {tc['tool']}: {result_str[:500]}")
+            findings.append(f"- {tc['tool']} returned: {result_str[:800]}")
 
         synthesis_prompt = (
             f"The user asked: {task}\n\n"
-            "Here is everything that was found:\n"
+            "Here is the EXACT data returned by tools — use ONLY these values:\n"
             + "\n".join(findings) +
-            "\n\nWrite a short, direct answer using only the information above. "
-            "Do not invent agents, names, addresses, hashes, or numbers that "
-            "are not shown above. If nothing useful was found, say so plainly "
-            "and suggest what to try next."
+            "\n\nWrite a direct answer. Include the exact agent_id, trust_score, "
+            "risk_level, owner_address, and recommendation from the data above. "
+            "Do not paraphrase addresses or scores. If a field is null or missing, say so. "
+            "Never invent values not present in the data above."
         )
 
         try:
@@ -322,7 +360,7 @@ class AgentLoop:
                 messages   = [LLMMessage(role="user", content=synthesis_prompt)],
                 tools      = [],
                 system     = SYSTEM_PROMPT,
-                max_tokens = 500,
+                max_tokens = 600,
             )
             return response.content.strip() or (
                 "I found some information but couldn't summarise it. Please try again."
@@ -330,7 +368,7 @@ class AgentLoop:
         except Exception as e:
             logger.warning(f"Synthesis pass failed: {e}")
             return "I found some information but ran into an issue summarising it. Please try again."
-    
+        
     async def run(self, task: str) -> dict:
         """
         Run the agent loop synchronously and return the final result.
@@ -391,26 +429,16 @@ class AgentLoop:
                     tool_call_id = tool_call.id,
                 ))
 
-        # final_response = ""
-        # for msg in reversed(self.messages):
-        #     if msg.role == "assistant" and msg.content:
-        #         final_response = msg.content
-        #         break
-
-        # return {
-        #     "response":        final_response,
-        #     "tool_calls_made": self.tool_calls_made,
-        #     "iterations":      self.iterations,
-        #     "model":           self._resolved_model or settings.default_llm_model,
-        #     "tools_used":      list({tc["tool"] for tc in self.tool_calls_made}),
-        # }
         final_response = ""
         for msg in reversed(self.messages):
             if msg.role == "assistant" and msg.content:
                 final_response = msg.content
                 break
-
-        if not final_response.strip():
+        # Always run synthesis if tool calls were made — grounds the answer in real data
+        if self.tool_calls_made:
+            logger.info("Tool calls made — running synthesis pass to ground response")
+            final_response = await self._force_synthesis(task)
+        elif not final_response.strip():
             logger.info("No grounded answer produced — running synthesis pass")
             final_response = await self._force_synthesis(task)
 
@@ -506,16 +534,7 @@ class AgentLoop:
                 }
 
             # No tool calls — final answer reached
-            # if not response.tool_calls:
-            #     yield {
-            #         "type":            "complete",
-            #         "response":        response.content,
-            #         "tool_calls_made": self.tool_calls_made,
-            #         "iterations":      self.iterations,
-            #         "model":           self._resolved_model or settings.default_llm_model,
-            #         "tools_used":      list({tc["tool"] for tc in self.tool_calls_made}),
-            #     }
-            #     return
+          
             if not response.tool_calls:
                 final = response.content.strip()
                 if not final:
@@ -563,28 +582,18 @@ class AgentLoop:
                 ))
 
         # Max iterations reached
-        # final_response = ""
-        # for msg in reversed(self.messages):
-        #     if msg.role == "assistant" and msg.content:
-        #         final_response = msg.content
-        #         break
-
-        # yield {
-        #     "type":            "complete",
-        #     "response":        final_response,
-        #     "tool_calls_made": self.tool_calls_made,
-        #     "iterations":      self.iterations,
-        #     "model":           self._resolved_model or settings.default_llm_model,
-        #     "tools_used":      list({tc["tool"] for tc in self.tool_calls_made}),
-        #     "note":            "Max iterations reached",
-        # }
+    
         final_response = ""
         for msg in reversed(self.messages):
             if msg.role == "assistant" and msg.content:
                 final_response = msg.content
                 break
-
-        if not final_response.strip():
+        
+        # Always run synthesis if tool calls were made — grounds the answer in real data
+        if self.tool_calls_made:
+            logger.info("Tool calls made — running synthesis pass to ground response")
+            final_response = await self._force_synthesis(task)
+        elif not final_response.strip():
             yield {"type": "reasoning", "content": "Pulling together what I found..."}
             final_response = await self._force_synthesis(task)
 
@@ -596,7 +605,7 @@ class AgentLoop:
             "model":           self._resolved_model or settings.default_llm_model,
             "tools_used":      list({tc["tool"] for tc in self.tool_calls_made}),
         }
-        
+
     # -------------------------------------------------------------------------
     # Tool execution router
     # -------------------------------------------------------------------------

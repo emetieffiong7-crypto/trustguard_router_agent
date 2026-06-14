@@ -1,0 +1,60 @@
+﻿{
+    "value":  [
+                  {
+                      "id":  "54d8637d-1282-4d2d-b7c1-600d9f89ab8c",
+                      "hackathonId":  "0bb95497-9b1d-4f30-9c86-cb174ca1a993",
+                      "trackId":  "718b474a-4a90-4c03-af67-21fa84800247",
+                      "slug":  "best-agent-1st",
+                      "title":  "Best Agent on Celo ΓÇö 1st Prize",
+                      "description":  "First place in the Best Agent on Celo track.",
+                      "prizeAmount":  "$2,500",
+                      "sourceUrl":  null,
+                      "createdAt":  "2026-06-08T05:20:01.530Z"
+                  },
+                  {
+                      "id":  "4dee1ddd-8da0-4d33-a9e8-33a0f76c10d6",
+                      "hackathonId":  "0bb95497-9b1d-4f30-9c86-cb174ca1a993",
+                      "trackId":  "718b474a-4a90-4c03-af67-21fa84800247",
+                      "slug":  "best-agent-2nd",
+                      "title":  "Best Agent on Celo ΓÇö 2nd Prize",
+                      "description":  "Second place in the Best Agent on Celo track.",
+                      "prizeAmount":  "$1,000",
+                      "sourceUrl":  null,
+                      "createdAt":  "2026-06-08T05:20:01.530Z"
+                  },
+                  {
+                      "id":  "cc2056d8-6d07-4536-a5ea-f6e8edca3d62",
+                      "hackathonId":  "0bb95497-9b1d-4f30-9c86-cb174ca1a993",
+                      "trackId":  "718b474a-4a90-4c03-af67-21fa84800247",
+                      "slug":  "best-agent-3rd",
+                      "title":  "Best Agent on Celo ΓÇö 3rd Prize",
+                      "description":  "Third place in the Best Agent on Celo track.",
+                      "prizeAmount":  "$500",
+                      "sourceUrl":  null,
+                      "createdAt":  "2026-06-08T05:20:01.530Z"
+                  },
+                  {
+                      "id":  "eb28c56b-af16-4fc8-9c09-c17863422fc0",
+                      "hackathonId":  "0bb95497-9b1d-4f30-9c86-cb174ca1a993",
+                      "trackId":  "ee0d8378-16c8-4b7d-9400-a2ae3e82cd40",
+                      "slug":  "8004scan-rank-1st",
+                      "title":  "Highest 8004scan Rank ΓÇö 1st Prize",
+                      "description":  "First place for the highest rank in 8004scan for Celo.",
+                      "prizeAmount":  "$500",
+                      "sourceUrl":  null,
+                      "createdAt":  "2026-06-08T05:20:01.530Z"
+                  },
+                  {
+                      "id":  "8fb5c72a-c7b9-4377-85ed-6c502410fd6c",
+                      "hackathonId":  "0bb95497-9b1d-4f30-9c86-cb174ca1a993",
+                      "trackId":  "c6f80364-161c-4148-84b6-dfc46c7b067e",
+                      "slug":  "most-activity-1st",
+                      "title":  "Most Activity ΓÇö 1st Prize",
+                      "description":  "First place for the most onchain transactions.",
+                      "prizeAmount":  "$500",
+                      "sourceUrl":  null,
+                      "createdAt":  "2026-06-08T05:20:01.530Z"
+                  }
+              ],
+    "Count":  5
+}
