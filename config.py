@@ -126,7 +126,7 @@ class Settings(BaseSettings):
     openai_api_key:     Optional[str] = Field(default=None, env="OPENAI_API_KEY")
     groq_api_key:       Optional[str] = Field(default=None, env="GROQ_API_KEY")
     default_llm_model:  str           = Field(
-        default="claude-sonnet-4-20250514",
+        default="llama-3.3-70b-versatile",
         env="DEFAULT_LLM_MODEL"
     )
 
