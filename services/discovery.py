@@ -531,6 +531,59 @@ async def _discover_from_local_with_reputation(
         min_score_applied      = min_score
     )
 
+async def search_agents_by_name(
+    query: str,
+    limit: int,
+    db:    AsyncSession,
+) -> DiscoveryResponse:
+    """
+    Search agents by name or description using local database.
+    Case-insensitive text match. Returns immediately from cache.
+    No external calls needed.
+    """
+    from sqlalchemy import or_, func
+
+    query_lower = f"%{query.lower()}%"
+
+    result = await db.execute(
+        select(Agent).where(
+            Agent.is_blacklisted == False,
+            or_(
+                func.lower(Agent.name).like(query_lower),
+                func.lower(Agent.description).like(query_lower),
+            )
+        ).order_by(
+            Agent.trust_score.desc()
+        ).limit(limit)
+    )
+    agents = result.scalars().all()
+
+    discovered = [
+        DiscoveredAgent(
+            agent_id         = a.agent_id,
+            owner_address    = a.owner_address,
+            wallet_address   = a.wallet_address,
+            name             = a.name,
+            description      = a.description,
+            a2a_endpoint     = a.a2a_endpoint,
+            supports_x402    = a.supports_x402 or False,
+            trust_score      = a.trust_score or 0,
+            self_verified    = a.self_verified or False,
+            self_proof_fresh = a.self_proof_fresh or False,
+            total_interactions = 0,
+            success_rate     = 0.0,
+            card_uri         = a.card_uri,
+        )
+        for a in agents
+    ]
+
+    return DiscoveryResponse(
+        results                = discovered,
+        total                  = len(discovered),
+        filtered_by_capability = None,
+        min_score_applied      = 0
+    )
+
 
 async def _discover_from_subgraph_mainnet(
     capability:         Optional[str],

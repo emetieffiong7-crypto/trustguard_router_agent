@@ -171,4 +171,26 @@ TRUSTGUARD_TOOLS = [
             "required": []
         }
     ),
+    ToolDefinition(
+        name        = "search_agents",
+        description = (
+            "Search for agents by name or description in the local database. "
+            "Use this first when a task mentions a specific agent by name. "
+            "Much faster than discover_agents for named agent lookups."
+        ),
+        parameters  = {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type":        "string",
+                    "description": "Agent name or description to search for"
+                },
+                "limit": {
+                    "type":    "integer",
+                    "default": 5
+                }
+            },
+            "required": ["query"]
+        }
+    ),
 ]

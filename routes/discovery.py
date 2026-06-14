@@ -93,3 +93,16 @@ async def discover_single_agent(
         )
 
     return profile
+
+@router.get("/search")
+async def search_agents(
+    q:     str = Query(..., description="Agent name or description to search for"),
+    limit: int = Query(10, le=50),
+    db: AsyncSession = Depends(get_db)
+) -> DiscoveryResponse:
+    """
+    Search agents by name or description.
+    Searches local database — instant response, no external calls.
+    """
+    from services.discovery import search_agents_by_name
+    return await search_agents_by_name(query=q, limit=limit, db=db)

@@ -32,17 +32,18 @@ Rules:
 # -------------------------------------------------------------------------
 
 # def _select_tools_for_task(task: str) -> list:
-#     """
-#     Select only the tools relevant to the task rather than sending
-#     all seven every time. Reduces token usage by 50-70% on focused tasks.
-
-#     Falls back to all tools if the task is ambiguous.
-#     """
 #     task_lower = task.lower()
 #     selected   = set()
 
-#     # Discovery is the most common starting point — always include
 #     selected.add("discover_agents")
+
+#     # Single agent lookup intent
+#     if any(w in task_lower for w in [
+#         "about agent", "tell me about", "who is", "find agent",
+#         "agent 0x", "agentid", "agent id", "address 0x",
+#         "profile", "details about", "information about", "trust"
+#     ]):
+#         selected.add("get_agent_profile")
 
 #     # Verification intent
 #     if any(w in task_lower for w in [
@@ -50,15 +51,17 @@ Rules:
 #         "working", "reachable", "valid", "confirm"
 #     ]):
 #         selected.add("verify_agent")
+#         selected.add("get_agent_profile")
 
-#     # Trust and score intent
+#     # Score and trust intent
 #     if any(w in task_lower for w in [
 #         "score", "trust", "reputation", "history",
 #         "reliable", "safe", "risk", "blacklist"
 #     ]):
 #         selected.add("get_agent_score")
+#         selected.add("get_agent_profile")
 
-#     # Payment and escrow intent
+#     # Payment intent
 #     if any(w in task_lower for w in [
 #         "pay", "escrow", "transfer", "send", "fund",
 #         "payment", "settle", "release", "refund", "lock"
@@ -66,19 +69,18 @@ Rules:
 #         selected.add("create_escrow")
 #         selected.add("release_escrow")
 #         selected.add("check_escrow_status")
+#         selected.add("get_agent_profile")
 
-#     # x402 micropayment intent
+#     # x402 intent
 #     if any(w in task_lower for w in [
 #         "x402", "micropay", "micro", "small payment",
 #         "pay per request", "http payment"
 #     ]):
 #         selected.add("execute_x402_payment")
 
-#     # If only discover was selected the task is ambiguous — send everything
 #     if len(selected) <= 1:
 #         return TRUSTGUARD_TOOLS
 
-#     # Build the ordered list preserving original tool order
 #     name_to_tool = {t.name: t for t in TRUSTGUARD_TOOLS}
 #     return [name_to_tool[name] for name in selected if name in name_to_tool]
 
@@ -86,15 +88,38 @@ def _select_tools_for_task(task: str) -> list:
     task_lower = task.lower()
     selected   = set()
 
+    # Always include discover as baseline
     selected.add("discover_agents")
 
-    # Single agent lookup intent
+    # Named agent search — always use search_agents first
+    # Detects: quoted names, "agent named X", "find X agent", known patterns
+    has_name_search = any(w in task_lower for w in [
+        "named", "called", "find agent", "search for",
+        "agent with name", "look for", "where is"
+    ]) or (
+        # Has a proper noun (capitalized word that is not a verb starter)
+        any(
+            word[0].isupper() and word.lower() not in [
+                "find", "get", "show", "list", "discover",
+                "tell", "what", "who", "can", "how"
+            ]
+            for word in task.split()
+            if len(word) > 2
+        )
+    )
+
+    if has_name_search:
+        selected.add("search_agents")
+        selected.add("get_agent_profile")
+
+    # Single agent lookup
     if any(w in task_lower for w in [
-        "about agent", "tell me about", "who is", "find agent",
+        "about agent", "tell me about", "who is",
         "agent 0x", "agentid", "agent id", "address 0x",
-        "profile", "details about", "information about", "trust"
+        "profile", "details about", "information about"
     ]):
         selected.add("get_agent_profile")
+        selected.add("search_agents")
 
     # Verification intent
     if any(w in task_lower for w in [
@@ -124,17 +149,16 @@ def _select_tools_for_task(task: str) -> list:
 
     # x402 intent
     if any(w in task_lower for w in [
-        "x402", "micropay", "micro", "small payment",
-        "pay per request", "http payment"
+        "x402", "micropay", "micro", "small payment"
     ]):
         selected.add("execute_x402_payment")
 
+    # Ambiguous task — send everything
     if len(selected) <= 1:
         return TRUSTGUARD_TOOLS
 
     name_to_tool = {t.name: t for t in TRUSTGUARD_TOOLS}
     return [name_to_tool[name] for name in selected if name in name_to_tool]
-
 # -------------------------------------------------------------------------
 # Model selection — cheaper model for simple tasks
 # -------------------------------------------------------------------------
@@ -375,6 +399,41 @@ class AgentLoop:
             "model":           self._resolved_model or settings.default_llm_model,
             "tools_used":      list({tc["tool"] for tc in self.tool_calls_made}),
         }
+    
+    async def _tool_search_agents(self, params: dict) -> dict:
+        from services.discovery import search_agents_by_name
+
+        result = await search_agents_by_name(
+            query = params["query"],
+            limit = params.get("limit", 5),
+            db    = self.db,
+        )
+
+        if not result.results:
+            return {
+                "found":   False,
+                "total":   0,
+                "message": f"No agents found matching '{params['query']}'. "
+                        f"Try discover_agents with a capability filter instead.",
+            }
+
+        return {
+            "found":   True,
+            "total":   result.total,
+            "results": [
+                {
+                    "agent_id":      a.agent_id,
+                    "name":          a.name,
+                    "description":   a.description,
+                    "trust_score":   a.trust_score,
+                    "self_verified": a.self_verified,
+                    "a2a_endpoint":  a.a2a_endpoint,
+                    "supports_x402": a.supports_x402,
+                    "owner_address": a.owner_address,
+                }
+                for a in result.results
+            ]
+        }
 
     async def stream(self, task: str) -> AsyncGenerator[dict, None]:
         """
@@ -519,6 +578,8 @@ class AgentLoop:
                 return await self._tool_execute_x402_payment(params)
             if tool_call.name == "get_agent_profile":
                 return await self._tool_get_agent_profile(params)
+            if tool_call.name == "search_agents":
+                return await self._tool_search_agents(params)
 
             return {
                 "error": f"Unknown tool: {tool_call.name}",

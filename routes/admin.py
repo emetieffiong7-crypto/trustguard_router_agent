@@ -1,5 +1,5 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Request, logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
@@ -40,6 +40,85 @@ async def generate_api_key(
         "message":    "Store this key securely. It will not be shown again."
     }
 
+@router.post("/keys/register")
+async def register_for_api_key(
+    label:   str,
+    email:   str = "",
+    purpose: str = "",
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """
+    Self-service API key registration for developers and agents.
+    No master key required — anyone can request a key.
+    Keys are active immediately.
+
+    For agents: pass your agent address as the label.
+    For developers: pass your name/project as the label.
+    """
+    import secrets
+    from db.models import ApiKey
+
+    new_key = secrets.token_urlsafe(32)
+
+    api_key = ApiKey(
+        key        = new_key,
+        label      = f"{label} | {purpose}" if purpose else label,
+        is_active  = True,
+    )
+    db.add(api_key)
+    await db.commit()
+
+    logger.info(f"New API key issued: label='{label}' purpose='{purpose}'")
+
+    return {
+        "key":        new_key,
+        "label":      label,
+        "created_at": api_key.created_at.isoformat(),
+        "rate_limit": "100 requests per minute",
+        "usage":      "Include as x-trustguard-api-key header in requests",
+        "message":    "Store this key securely. It will not be shown again.",
+        "docs":       "https://your-railway-app.up.railway.app/docs"
+    }
+
+
+@router.get("/keys/me")
+async def my_key_info(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """
+    Returns information about the currently authenticated key.
+    Works for both API keys and Self Agent ID authentication.
+    """
+    auth_type = getattr(request.state, "auth_type", "unknown")
+
+    if auth_type == "self_agent":
+        agent_info = getattr(request.state, "agent_info", {})
+        return {
+            "auth_type":     "self_agent",
+            "agent_address": agent_info.get("agentAddress"),
+            "agent_id":      agent_info.get("agentId"),
+            "verified":      agent_info.get("valid", False),
+            "rate_limit":    "200 requests per minute",
+        }
+
+    if auth_type == "master":
+        return {
+            "auth_type":  "master",
+            "rate_limit": "1000 requests per minute",
+            "access":     "full admin access",
+        }
+
+    if auth_type == "api_key":
+        key_info = getattr(request.state, "key_info", {})
+        return {
+            "auth_type":  "api_key",
+            "label":      key_info.get("label"),
+            "key_id":     key_info.get("id"),
+            "rate_limit": "100 requests per minute",
+        }
+
+    return {"auth_type": "unknown"}
 
 @router.get("/keys")
 async def list_api_keys(
@@ -81,6 +160,36 @@ async def revoke_api_key(
     await db.commit()
 
     return {"message": f"Key {key_id} ({key.label}) revoked"}
+
+@router.post("/enrich/contracts")
+async def enrich_from_contracts(
+    limit:        int  = 200,
+    only_missing: bool = True,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(_require_master_key)
+) -> dict:
+    """
+    Enrich agent database with reputation and Self data
+    fetched directly from ERC-8004 contracts and Self REST API.
+    Zero gas cost. Run this to improve scores without waiting for subgraph.
+    """
+    import asyncio
+    from scripts.backfill_agents import enrich_agents_with_contract_data
+
+    asyncio.create_task(
+        enrich_agents_with_contract_data(
+            db_session   = db,
+            limit        = limit,
+            only_missing = only_missing,
+        )
+    )
+
+    return {
+        "message":     "Contract enrichment started in background",
+        "limit":       limit,
+        "only_missing": only_missing,
+        "gas_cost":    "zero — all read operations",
+    }
 
 
 @router.post("/backfill")

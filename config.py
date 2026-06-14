@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool      = True
     port: int        = Field(default=8000, env="PORT")
-    api_key: str     = Field(env="TRUSTGUARD_API_KEY")
+    api_key: str     = Field(default="dev-key-123", env="TRUSTGUARD_API_KEY")
 
     # -------------------------------------------------------------------------
     # Database
@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     # Celo RPC
     # -------------------------------------------------------------------------
     celo_rpc_url: str  = Field(
+        default=None,
         env="CELO_RPC_URL"
     )
     celo_chain_id: int = 42220
@@ -83,7 +84,7 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     # Self Agent ID API
     # -------------------------------------------------------------------------
-    self_api_base_url:      str          = Field(default="https://app.ai.self.xyz", env="SELF_API_BASE_URL")
+    self_api_base_url:      str          = Field(default=None, env="SELF_API_BASE_URL")
     self_network:           str          = Field(default="celo", env="SELF_NETWORK")
     self_agent_private_key: Optional[str] = Field(default=None, env="SELF_AGENT_PRIVATE_KEY")
     self_agent_public_key:  Optional[str] = Field(default=None, env="SELF_AGENT_PUBLIC_KEY")
@@ -124,7 +125,10 @@ class Settings(BaseSettings):
     anthropic_api_key:  Optional[str] = Field(default=None, env="ANTHROPIC_API_KEY")
     openai_api_key:     Optional[str] = Field(default=None, env="OPENAI_API_KEY")
     groq_api_key:       Optional[str] = Field(default=None, env="GROQ_API_KEY")
-    default_llm_model:  str           = Field(env="DEFAULT_LLM_MODEL")
+    default_llm_model:  str           = Field(
+        default="claude-sonnet-4-20250514",
+        env="DEFAULT_LLM_MODEL"
+    )
 
     # -------------------------------------------------------------------------
     # x402
