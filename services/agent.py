@@ -4,7 +4,7 @@ from typing import Optional, AsyncGenerator
 from datetime import datetime
 from fastapi import params
 from sqlalchemy.ext.asyncio import AsyncSession
-
+import re
 from agent.base import LLMMessage, ToolCall, LLMResponse
 from agent.router import get_llm_provider
 from agent.tools import TRUSTGUARD_TOOLS
@@ -19,6 +19,10 @@ logger = logging.getLogger("trustguard.agent")
 SYSTEM_PROMPT = """You are TrustGuard, a Celo infrastructure agent.
 Help people find, check, and safely pay agents in the Celo ecosystem.
 
+CRITICAL: You MUST call a tool before answering ANY question about agents.
+Never answer from memory. If someone asks about agent 9268 etc, call get_agent_profile
+with agent_id=9268 immediately. Never ask for more information first.
+
 Rules:
 - Only talk about agents and data your tools actually returned. Never invent
   agent names, hashes, block numbers, or addresses.
@@ -29,10 +33,10 @@ Rules:
 - Verify unknown agents before suggesting payment.
 - Use escrow for amounts above the threshold or for low-trust agents.
 - Use x402 only for small amounts to trusted agents.
-- IMPORTANT: When answering, always include the exact agent_id, trust_score,
-  risk_level, and owner_address from the tool result. Do not summarise these
-  away. Format your answer as: Agent #<id> | Score: <n>/100 | Risk: <level> |
-  Owner: <address> — then explain what you found."""
+- Keep your written answer short and conversational — 2 to 4 sentences.
+  The agent's ID, score, address, and other raw details are shown to the
+  user separately in a card, so don't repeat long numbers, addresses, or
+  hashes in your text. Focus on what the data means and what you'd suggest."""
 
 # -------------------------------------------------------------------------
 # Tool selection — send only relevant tools per task
@@ -47,6 +51,11 @@ def _select_tools_for_task(task: str) -> list:
 
     # Named agent search — always use search_agents first
     # Detects: quoted names, "agent named X", "find X agent", known patterns
+    has_agent_id = bool(re.search(r'\bagent\s+\d+\b|\b\d{4,}\b', task_lower))
+    if has_agent_id:
+        selected.add("get_agent_profile")
+        selected.add("search_agents")
+
     has_name_search = any(w in task_lower for w in [
         "named", "called", "find agent", "search for",
         "agent with name", "look for", "where is"
@@ -333,6 +342,12 @@ class AgentLoop:
     #         logger.warning(f"Synthesis pass failed: {e}")
     #         return "I found some information but ran into an issue summarising it. Please try again."
     async def _force_synthesis(self, task: str) -> str:
+        """
+        Fallback only — called when the loop ended without any real text
+        answer (empty content or max iterations with nothing). Makes one
+        final call with no tools, grounded strictly in what was found, so
+        the user never sees a blank or hallucinated response.
+        """
         if not self.tool_calls_made:
             return (
                 "I couldn't find anything useful for that. Try rephrasing, "
@@ -342,16 +357,18 @@ class AgentLoop:
         findings = []
         for tc in self.tool_calls_made:
             result_str = json.dumps(tc["result"], default=str)
-            findings.append(f"- {tc['tool']} returned: {result_str[:800]}")
+            findings.append(f"- {tc['tool']} returned: {result_str[:600]}")
 
         synthesis_prompt = (
             f"The user asked: {task}\n\n"
-            "Here is the EXACT data returned by tools — use ONLY these values:\n"
+            "Here is the data your tools returned:\n"
             + "\n".join(findings) +
-            "\n\nWrite a direct answer. Include the exact agent_id, trust_score, "
-            "risk_level, owner_address, and recommendation from the data above. "
-            "Do not paraphrase addresses or scores. If a field is null or missing, say so. "
-            "Never invent values not present in the data above."
+            "\n\nWrite a short, natural 2-4 sentence answer based only on this "
+            "data. The exact IDs, scores, and addresses will be shown to the "
+            "user separately in a card, so focus on what it means and what "
+            "you'd suggest — don't repeat long addresses or hashes. If nothing "
+            "useful was found, say so plainly and suggest what to try next. "
+            "Never invent agents or values not present above."
         )
 
         try:
@@ -360,7 +377,7 @@ class AgentLoop:
                 messages   = [LLMMessage(role="user", content=synthesis_prompt)],
                 tools      = [],
                 system     = SYSTEM_PROMPT,
-                max_tokens = 600,
+                max_tokens = 400,
             )
             return response.content.strip() or (
                 "I found some information but couldn't summarise it. Please try again."
@@ -434,11 +451,8 @@ class AgentLoop:
             if msg.role == "assistant" and msg.content:
                 final_response = msg.content
                 break
-        # Always run synthesis if tool calls were made — grounds the answer in real data
-        if self.tool_calls_made:
-            logger.info("Tool calls made — running synthesis pass to ground response")
-            final_response = await self._force_synthesis(task)
-        elif not final_response.strip():
+
+        if not final_response.strip():
             logger.info("No grounded answer produced — running synthesis pass")
             final_response = await self._force_synthesis(task)
 
@@ -589,11 +603,7 @@ class AgentLoop:
                 final_response = msg.content
                 break
         
-        # Always run synthesis if tool calls were made — grounds the answer in real data
-        if self.tool_calls_made:
-            logger.info("Tool calls made — running synthesis pass to ground response")
-            final_response = await self._force_synthesis(task)
-        elif not final_response.strip():
+        if not final_response.strip():
             yield {"type": "reasoning", "content": "Pulling together what I found..."}
             final_response = await self._force_synthesis(task)
 
@@ -718,6 +728,7 @@ class AgentLoop:
             "agent_id":       profile["agent_id"],
             "owner_address":  profile["owner_address"],
             "name":           profile["name"],
+            "description":    profile["description"],
             "trust_score":    profile["trust_score"],
             "risk_level":     profile["risk_level"],
             "is_blacklisted": profile["is_blacklisted"],
@@ -761,6 +772,7 @@ class AgentLoop:
                 {
                     "agent_id":      a.agent_id,
                     "name":          a.name or f"Agent #{a.agent_id}",
+                    "description":   a.description,
                     "trust_score":   a.trust_score,
                     "self_verified": a.self_verified,
                     "supports_x402": a.supports_x402,
