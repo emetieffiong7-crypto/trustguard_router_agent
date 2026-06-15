@@ -10,4 +10,3 @@ railway.toml
 sql_migrate.py
 workflow.md
 scripts/*
-*.tmp_celo_auth
