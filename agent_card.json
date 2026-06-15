@@ -35,7 +35,7 @@
     },
     {
       "name": "mcp",
-      "endpoint": "https://trustguardrouteragent-production.up.railway.app",
+      "endpoint": "https://trustguardrouteragent-production.up.railway.app/",
       "version": "2025-06-15"
     }
   ],

@@ -74,14 +74,16 @@ app.add_middleware(
     allow_headers = ["*"],
 )
 
-app.include_router(agent_router)
-app.include_router(verify_router)
-app.include_router(discover_router)
-app.include_router(escrow_router)
-app.include_router(score_router)
-app.include_router(admin_router)
+# @app.get("/", include_in_schema=False)
+# async def root():
+#     return {
+#         "name": "TrustGuard Router",
+#         "version": "1.0.0",
+#         "docs": "/docs",
+#         "agent_card": "/.well-known/agent.json"
+#     }
 
-@app.get("/", include_in_schema=False)
+@app.api_route("/", methods=["GET", "HEAD", "POST"], include_in_schema=False)
 async def root():
     return {
         "name": "TrustGuard Router",
@@ -89,3 +91,12 @@ async def root():
         "docs": "/docs",
         "agent_card": "/.well-known/agent.json"
     }
+
+
+app.include_router(agent_router)
+app.include_router(verify_router)
+app.include_router(discover_router)
+app.include_router(escrow_router)
+app.include_router(score_router)
+app.include_router(admin_router)
+
