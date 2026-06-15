@@ -1,34 +1,3 @@
-# from fastapi import APIRouter, Depends, Query
-# from typing import Optional
-# from sqlalchemy.ext.asyncio import AsyncSession
-
-# from db.base import get_db
-# from schemas.discovery import DiscoveryResponse
-# from services.discovery import discover_agents
-
-# router = APIRouter(prefix="/discover", tags=["Discovery"])
-
-
-# @router.get("", response_model=DiscoveryResponse)
-# async def discover(
-#     capability:          Optional[str] = Query(None, description="Filter by capability: a2a, x402, payments"),
-#     min_score:           int           = Query(0,    description="Minimum TrustGuard score (0-100)"),
-#     self_verified_only:  bool          = Query(False, description="Only return Self-verified agents"),
-#     limit:               int           = Query(10,   description="Maximum number of results", le=50),
-#     db: AsyncSession = Depends(get_db)
-# ) -> DiscoveryResponse:
-#     """
-#     Discover registered ERC-8004 agents ranked by TrustGuard score.
-#     Optionally filter by capability, minimum score, or Self verification status.
-#     """
-#     return await discover_agents(
-#         capability         = capability,
-#         min_score          = min_score,
-#         self_verified_only = self_verified_only,
-#         limit              = limit,
-#         db                 = db
-#     )
-
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -106,3 +75,38 @@ async def search_agents(
     """
     from services.discovery import search_agents_by_name
     return await search_agents_by_name(query=q, limit=limit, db=db)
+
+@router.get("/activity")
+async def recent_activity(
+    limit: int = Query(20, le=50),
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """
+    Recent verification checks TrustGuard has run on agents.
+    Powers the live activity feed. Public, read-only.
+    """
+    from db.models import Probe, Agent
+    from sqlalchemy import select
+
+    result = await db.execute(
+        select(Probe, Agent)
+        .outerjoin(Agent, Agent.agent_id == Probe.agent_id)
+        .order_by(Probe.probed_at.desc())
+        .limit(limit)
+    )
+
+    activity = []
+    for probe, agent in result.all():
+        activity.append({
+            "agent_id":         probe.agent_id,
+            "agent_name":       agent.name if agent else None,
+            "trust_score":      agent.trust_score if agent else None,
+            "passed":           probe.passed,
+            "evidence":         probe.evidence,
+            "response_time_ms": probe.response_time_ms,
+            "posted_onchain":   probe.posted_onchain,
+            "tx_hash":          probe.tx_hash,
+            "probed_at":        probe.probed_at.isoformat() if probe.probed_at else None,
+        })
+
+    return {"activity": activity, "total": len(activity)}
