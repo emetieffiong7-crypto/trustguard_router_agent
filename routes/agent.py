@@ -255,11 +255,44 @@ async def agent_a2a(
         }
     }
 
-@router.get("/agent/a2a")
+@router.get("/agent/a2a", include_in_schema=False)
 async def agent_a2a_info():
     return {
         "protocol": "A2A",
         "version": "0.3.0",
+        "name": "TrustGuard Router",
         "description": "TrustGuard A2A endpoint. Send POST requests with JSON-RPC message/send format.",
-        "docs": "https://trustguardrouteragent-production.up.railway.app/docs"
+        "url": "https://trustguardrouteragent-production.up.railway.app/agent/a2a",
+        "skills": [
+            {
+                "id": "agent-verification",
+                "name": "Agent Verification",
+                "description": "Probe and verify ERC-8004 agents on Celo, checking endpoint health and Self ID credentials."
+            },
+            {
+                "id": "agent-discovery",
+                "name": "Agent Discovery",
+                "description": "Discover and search registered ERC-8004 agents by capability, trust score, or name."
+            },
+            {
+                "id": "trust-scoring",
+                "name": "Trust Scoring",
+                "description": "Compute and retrieve on-chain trust scores and risk levels for Celo agents."
+            },
+            {
+                "id": "escrow-routing",
+                "name": "Escrow Routing",
+                "description": "Create, manage, and release USDC escrow payments between agents on Celo."
+            },
+            {
+                "id": "x402-payments",
+                "name": "x402 Payments",
+                "description": "Execute x402 micropayments to agents that support pay-per-use HTTP endpoints."
+            },
+            {
+                "id": "natural-language-tasks",
+                "name": "Natural Language Task Execution",
+                "description": "Execute natural language tasks using an LLM agent loop with access to all TrustGuard tools."
+            }
+        ]
     }
