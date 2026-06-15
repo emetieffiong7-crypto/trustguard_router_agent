@@ -1,57 +1,52 @@
 {
   "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
   "name": "TrustGuard Router",
-  "description": "Infrastructure agent providing verification, discovery, escrow routing, trust scoring and LLM-powered task execution for the Celo ecosystem.",
-  "image": "",
+  "description": "Infrastructure agent providing verification, discovery, escrow routing, trust scoring and natural language task execution for the agentic ecosystem. Supports agent-to-agent communication via A2A v0.3.0, x402 micropayments, and natural language task execution.",
+  "image": "https://trustguard-khaki.vercel.app/logo.png",
   "active": true,
+  "x402Support": true,
   "version": "1.0.0",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "TrustGuard",
+      "url": "https://trustguard-khaki.vercel.app"
+    }
+  ],
+  "links": {
+    "website": "https://trustguard-khaki.vercel.app",
+    "docs": "https://trustguardrouteragent-production.up.railway.app/docs",
+    "github": "https://github.com/Etette/trustguard"
+  },
   "services": [
     {
       "name": "web",
       "endpoint": "https://trustguard-khaki.vercel.app/"
     },
     {
-      "type": "a2a",
-      "url": "https://trustguardrouteragent-production.up.railway.app/agent/a2a"
+      "name": "a2a",
+      "endpoint": "https://trustguardrouteragent-production.up.railway.app/agent/a2a",
+      "version": "0.3.0"
+    },
+     {
+    "name": "api",
+    "endpoint": "https://trustguardrouteragent-production.up.railway.app/docs",
+    "version": "1.0.0"
     },
     {
-      "type": "api",
-      "url": "https://trustguardrouteragent-production.up.railway.app"
+      "name": "mcp",
+      "endpoint": "https://trustguardrouteragent-production.up.railway.app",
+      "version": "2025-06-15"
     }
   ],
-  "capabilities": [
-    "agent-verification",
-    "agent-discovery",
-    "escrow-routing",
-    "trust-scoring",
-    "x402-payments",
-    "natural-language-task-execution"
-  ],
-  "supportedModels": [
-    "claude-sonnet-4-20250514",
-    "gpt-4o",
-    "llama-3.3-70b-versatile"
-  ],
-  "supportedTrust": ["reputation", "validation"],
-  "supportedTokens": [
+  "registrations": [
     {
-      "symbol":  "USDm",
-      "address": "0x765DE816845861e75A25fCA122bb6898B8B1282a",
-      "chainId": 42220
-    },
-    {
-      "symbol":  "USDC",
-      "address": "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
-      "chainId": 42220
+      "agentId": 9268,
+      "agentRegistry": "eip155:42220:0x8004A169FB4a3325136EB29fA0ceB6D2e539a432"
     }
   ],
-  "x402": {
-    "supported": true,
-    "pricePerTask": "1000",
-    "currency": "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
-    "chainId": 42220
-  },
-  "chainId": 42220,
-  "network": "celo-mainnet",
-  "x402Support": true
+  "supportedTrust": [
+    "reputation",
+    "crypto-economic"
+  ]
 }
