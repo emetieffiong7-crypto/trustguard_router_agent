@@ -254,3 +254,12 @@ async def agent_a2a(
             "iterations":      result["iterations"],
         }
     }
+
+@router.get("/agent/a2a")
+async def agent_a2a_info():
+    return {
+        "protocol": "A2A",
+        "version": "0.3.0",
+        "description": "TrustGuard A2A endpoint. Send POST requests with JSON-RPC message/send format.",
+        "docs": "https://trustguardrouteragent-production.up.railway.app/docs"
+    }

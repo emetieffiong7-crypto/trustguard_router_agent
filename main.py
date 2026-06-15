@@ -62,6 +62,8 @@ app = FastAPI(
     redoc_url = "/redoc",
 )
 
+
+
 # Middleware order matters — auth first, then x402
 app.add_middleware(X402ServerMiddleware)
 app.add_middleware(RouterAuthMiddleware)
@@ -78,3 +80,12 @@ app.include_router(discover_router)
 app.include_router(escrow_router)
 app.include_router(score_router)
 app.include_router(admin_router)
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return {
+        "name": "TrustGuard Router",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "agent_card": "/.well-known/agent.json"
+    }

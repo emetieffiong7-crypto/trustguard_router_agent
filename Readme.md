@@ -38,7 +38,7 @@ Smart Contracts:
 Agent Identity:
 
 - ERC-8004 Agent ID: 9268
-- Agent Card: https://gist.githubusercontent.com/Etette/2b1fe04c6a13187db31f9ae806487d87/raw/219f0f3fddb74c67bdcc9e4a2a1abc04f93f033e/agent_card.json
+- Agent Card: https://gist.githubusercontent.com/Etette/2b1fe04c6a13187db31f9ae806487d87/raw/71d90c090f2794f32db6528e137e087f7b453dc5/agent_card.json
 - 8004scan: https://8004scan.xyz/agent/9268
 
 
